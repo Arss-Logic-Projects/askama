@@ -3,15 +3,17 @@ use std::task::{Context, Poll};
 use futures_util::stream::*;
 use futures_util::ready;
 
+pub use futures_util::stream::Filter;
+
 pin_project_lite::pin_project! {
-    pub struct AsyncTemplateLoop<St: Sized> {
+    pub struct AsyncTemplateLoop<St: Stream> {
         #[pin]
         stream: Peekable<Enumerate<St>>
     }
 }
 
-impl<St: Stream + Sized> AsyncTemplateLoop<I> {
-    pub fn new(stream: I) -> Self {
+impl<St: Stream> AsyncTemplateLoop<St> {
+    pub fn new(stream: St) -> Self {
         AsyncTemplateLoop { stream: stream.enumerate().peekable() }
     }
 }

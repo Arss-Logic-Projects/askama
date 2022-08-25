@@ -295,24 +295,6 @@ impl<'a> Generator<'a> {
         let mut buf = Buffer::new(0);
 
         self.impl_template(ctx, &mut buf)?;
-        self.impl_display(&mut buf)?;
-
-        #[cfg(feature = "with-actix-web")]
-        self.impl_actix_web_responder(&mut buf)?;
-        #[cfg(feature = "with-axum")]
-        self.impl_axum_into_response(&mut buf)?;
-        #[cfg(feature = "with-gotham")]
-        self.impl_gotham_into_response(&mut buf)?;
-        #[cfg(feature = "with-hyper")]
-        self.impl_hyper_into_response(&mut buf)?;
-        #[cfg(feature = "with-mendes")]
-        self.impl_mendes_responder(&mut buf)?;
-        #[cfg(feature = "with-rocket")]
-        self.impl_rocket_responder(&mut buf)?;
-        #[cfg(feature = "with-tide")]
-        self.impl_tide_integrations(&mut buf)?;
-        #[cfg(feature = "with-warp")]
-        self.impl_warp_reply(&mut buf)?;
 
         Ok(buf.buf)
     }
@@ -324,10 +306,9 @@ impl<'a> Generator<'a> {
         buf: &mut Buffer,
     ) -> Result<(), CompileError> {
         self.write_header(buf, "::askama::Template", None)?;
-        buf.writeln(
-            "fn render_into(&self, writer: &mut (impl ::std::fmt::Write + ?Sized)) -> \
-             ::askama::Result<()> {",
-        )?;
+        buf.writeln("#[allow(unused_mut)]")?;
+        buf.writeln("fn render(mut self) -> ::askama::RenderResult {")?;
+        buf.writeln("::std::boxed::Box::pin(::askama::try_stream! {")?;
 
         // Make sure the compiler understands that the generated code depends on the template files.
         for path in self.contexts.keys() {
@@ -354,7 +335,7 @@ impl<'a> Generator<'a> {
         }?;
 
         self.flush_ws(Ws(None, None));
-        buf.writeln("::askama::Result::Ok(())")?;
+        buf.writeln("})")?;
         buf.writeln("}")?;
 
         buf.writeln("const EXTENSION: ::std::option::Option<&'static ::std::primitive::str> = ")?;
@@ -371,197 +352,6 @@ impl<'a> Generator<'a> {
 
         buf.writeln("}")?;
         Ok(())
-    }
-
-    // Implement `Display` for the given context struct.
-    fn impl_display(&mut self, buf: &mut Buffer) -> Result<(), CompileError> {
-        self.write_header(buf, "::std::fmt::Display", None)?;
-        buf.writeln("#[inline]")?;
-        buf.writeln("fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {")?;
-        buf.writeln("::askama::Template::render_into(self, f).map_err(|_| ::std::fmt::Error {})")?;
-        buf.writeln("}")?;
-        buf.writeln("}")
-    }
-
-    // Implement Actix-web's `Responder`.
-    #[cfg(feature = "with-actix-web")]
-    fn impl_actix_web_responder(&mut self, buf: &mut Buffer) -> Result<(), CompileError> {
-        self.write_header(buf, "::askama_actix::actix_web::Responder", None)?;
-        buf.writeln("type Body = ::askama_actix::actix_web::body::BoxBody;")?;
-        buf.writeln("#[inline]")?;
-        buf.writeln(
-            "fn respond_to(self, _req: &::askama_actix::actix_web::HttpRequest) \
-             -> ::askama_actix::actix_web::HttpResponse<Self::Body> {",
-        )?;
-        buf.writeln("<Self as ::askama_actix::TemplateToResponse>::to_response(&self)")?;
-        buf.writeln("}")?;
-        buf.writeln("}")
-    }
-
-    // Implement Axum's `IntoResponse`.
-    #[cfg(feature = "with-axum")]
-    fn impl_axum_into_response(&mut self, buf: &mut Buffer) -> Result<(), CompileError> {
-        self.write_header(buf, "::askama_axum::IntoResponse", None)?;
-        buf.writeln("#[inline]")?;
-        buf.writeln(
-            "fn into_response(self)\
-             -> ::askama_axum::Response {",
-        )?;
-        let ext = self.input.extension().unwrap_or("txt");
-        buf.writeln(&format!("::askama_axum::into_response(&self, {:?})", ext))?;
-        buf.writeln("}")?;
-        buf.writeln("}")
-    }
-
-    // Implement gotham's `IntoResponse`.
-    #[cfg(feature = "with-gotham")]
-    fn impl_gotham_into_response(&mut self, buf: &mut Buffer) -> Result<(), CompileError> {
-        self.write_header(buf, "::askama_gotham::IntoResponse", None)?;
-        buf.writeln("#[inline]")?;
-        buf.writeln(
-            "fn into_response(self, _state: &::askama_gotham::State)\
-             -> ::askama_gotham::Response<::askama_gotham::Body> {",
-        )?;
-        let ext = self.input.extension().unwrap_or("txt");
-        buf.writeln(&format!("::askama_gotham::respond(&self, {:?})", ext))?;
-        buf.writeln("}")?;
-        buf.writeln("}")
-    }
-
-    // Implement `From<Template> for hyper::Response<Body>`.
-    #[cfg(feature = "with-hyper")]
-    fn impl_hyper_into_response(&mut self, buf: &mut Buffer) -> Result<(), CompileError> {
-        let (impl_generics, orig_ty_generics, where_clause) =
-            self.input.ast.generics.split_for_impl();
-        let ident = &self.input.ast.ident;
-        buf.writeln(&format!(
-            "{} {{",
-            quote!(
-                impl #impl_generics ::core::convert::From<&#ident #orig_ty_generics>
-                for ::askama_hyper::hyper::Response<::askama_hyper::hyper::Body>
-                #where_clause
-            )
-        ))?;
-        buf.writeln("#[inline]")?;
-        buf.writeln(&format!(
-            "{} {{",
-            quote!(fn from(value: &#ident #orig_ty_generics) -> Self)
-        ))?;
-        let ext = self.input.extension().unwrap_or("txt");
-        buf.writeln(&format!("::askama_hyper::respond(value, {:?})", ext))?;
-        buf.writeln("}")?;
-        buf.writeln("}")
-    }
-
-    // Implement mendes' `Responder`.
-    #[cfg(feature = "with-mendes")]
-    fn impl_mendes_responder(&mut self, buf: &mut Buffer) -> Result<(), CompileError> {
-        let param = syn::parse_str("A: ::mendes::Application").unwrap();
-
-        let mut generics = self.input.ast.generics.clone();
-        generics.params.push(param);
-        let (_, orig_ty_generics, _) = self.input.ast.generics.split_for_impl();
-        let (impl_generics, _, where_clause) = generics.split_for_impl();
-
-        let mut where_clause = match where_clause {
-            Some(clause) => clause.clone(),
-            None => syn::WhereClause {
-                where_token: syn::Token![where](proc_macro2::Span::call_site()),
-                predicates: syn::punctuated::Punctuated::new(),
-            },
-        };
-
-        where_clause
-            .predicates
-            .push(syn::parse_str("A::ResponseBody: From<String>").unwrap());
-        where_clause
-            .predicates
-            .push(syn::parse_str("A::Error: From<::askama_mendes::Error>").unwrap());
-
-        buf.writeln(
-            format!(
-                "{} {} for {} {} {{",
-                quote!(impl#impl_generics),
-                "::mendes::application::IntoResponse<A>",
-                self.input.ast.ident,
-                quote!(#orig_ty_generics #where_clause),
-            )
-            .as_ref(),
-        )?;
-
-        buf.writeln(
-            "fn into_response(self, app: &A, req: &::mendes::http::request::Parts) \
-             -> ::mendes::http::Response<A::ResponseBody> {",
-        )?;
-
-        buf.writeln(&format!(
-            "::askama_mendes::into_response(app, req, &self, {:?})",
-            self.input.extension()
-        ))?;
-        buf.writeln("}")?;
-        buf.writeln("}")?;
-        Ok(())
-    }
-
-    // Implement Rocket's `Responder`.
-    #[cfg(feature = "with-rocket")]
-    fn impl_rocket_responder(&mut self, buf: &mut Buffer) -> Result<(), CompileError> {
-        let lifetime = syn::Lifetime::new("'askama", proc_macro2::Span::call_site());
-        let param = syn::GenericParam::Lifetime(syn::LifetimeDef::new(lifetime));
-        self.write_header(
-            buf,
-            "::askama_rocket::Responder<'askama, 'askama>",
-            Some(vec![param]),
-        )?;
-
-        buf.writeln("#[inline]")?;
-        buf.writeln(
-            "fn respond_to(self, _: &::askama_rocket::Request) \
-             -> ::askama_rocket::Result<'askama> {",
-        )?;
-        let ext = self.input.extension().unwrap_or("txt");
-        buf.writeln(&format!("::askama_rocket::respond(&self, {:?})", ext))?;
-
-        buf.writeln("}")?;
-        buf.writeln("}")?;
-        Ok(())
-    }
-
-    #[cfg(feature = "with-tide")]
-    fn impl_tide_integrations(&mut self, buf: &mut Buffer) -> Result<(), CompileError> {
-        let ext = self.input.extension().unwrap_or("txt");
-
-        self.write_header(
-            buf,
-            "::std::convert::TryInto<::askama_tide::tide::Body>",
-            None,
-        )?;
-        buf.writeln(
-            "type Error = ::askama_tide::askama::Error;\n\
-            #[inline]\n\
-            fn try_into(self) -> ::askama_tide::askama::Result<::askama_tide::tide::Body> {",
-        )?;
-        buf.writeln(&format!("::askama_tide::try_into_body(&self, {:?})", &ext))?;
-        buf.writeln("}")?;
-        buf.writeln("}")?;
-
-        buf.writeln("#[allow(clippy::from_over_into)]")?;
-        self.write_header(buf, "Into<::askama_tide::tide::Response>", None)?;
-        buf.writeln("#[inline]")?;
-        buf.writeln("fn into(self) -> ::askama_tide::tide::Response {")?;
-        buf.writeln(&format!("::askama_tide::into_response(&self, {:?})", ext))?;
-        buf.writeln("}\n}")
-    }
-
-    #[cfg(feature = "with-warp")]
-    fn impl_warp_reply(&mut self, buf: &mut Buffer) -> Result<(), CompileError> {
-        self.write_header(buf, "::askama_warp::warp::reply::Reply", None)?;
-        buf.writeln("#[inline]")?;
-        buf.writeln("fn into_response(self) -> ::askama_warp::warp::reply::Response {")?;
-        let ext = self.input.extension().unwrap_or("txt");
-        buf.writeln(&format!("::askama_warp::reply(&self, {:?})", ext))?;
-        buf.writeln("}")?;
-        buf.writeln("}")
     }
 
     // Writes header for the `impl` for `TraitFromPathName` or `Template`
@@ -811,26 +601,34 @@ impl<'a> Generator<'a> {
         let flushed = self.write_buf_writable(buf)?;
         buf.writeln("{")?;
         buf.writeln("let mut _did_loop = false;")?;
-        match loop_block.iter {
-            Expr::Range(_, _, _) => buf.writeln(&format!("let _iter = {};", expr_code)),
-            Expr::Array(..) => buf.writeln(&format!("let _iter = {}.iter();", expr_code)),
-            // If `iter` is a call then we assume it's something that returns
-            // an iterator. If not then the user can explicitly add the needed
-            // call without issues.
-            Expr::Call(..) | Expr::Index(..) => {
-                buf.writeln(&format!("let _iter = ({}).into_iter();", expr_code))
-            }
-            // If accessing `self` then it most likely needs to be
-            // borrowed, to prevent an attempt of moving.
-            _ if expr_code.starts_with("self.") => {
-                buf.writeln(&format!("let _iter = (&{}).into_iter();", expr_code))
-            }
-            // If accessing a field then it most likely needs to be
-            // borrowed, to prevent an attempt of moving.
-            Expr::Attr(..) => buf.writeln(&format!("let _iter = (&{}).into_iter();", expr_code)),
-            // Otherwise, we borrow `iter` assuming that it implements `IntoIterator`.
-            _ => buf.writeln(&format!("let _iter = ({}).into_iter();", expr_code)),
-        }?;
+        if !loop_block.is_await {
+            match loop_block.iter {
+                Expr::Range(_, _, _) => buf.writeln(&format!("let _iter = {expr_code};")),
+                Expr::Array(..) => buf.writeln(&format!("let _iter = {expr_code}.iter();")),
+                // If `iter` is a call then we assume it's something that returns
+                // an iterator. If not then the user can explicitly add the needed
+                // call without issues.
+                Expr::Call(..) | Expr::Index(..) => {
+                    buf.writeln(&format!("let _iter = ({expr_code}).into_iter();"))
+                }
+
+                // If accessing `self` then it most likely needs to be
+                // borrowed, to prevent an attempt of moving.
+                _ if expr_code.starts_with("self.") => {
+                    buf.writeln(&format!("let _iter = (&{expr_code}).into_iter();"))
+                }
+
+                // If accessing a field then it most likely needs to be
+                // borrowed, to prevent an attempt of moving.
+                Expr::Attr(..) => buf.writeln(&format!("let _iter = (&{expr_code}).into_iter();")),
+
+                // Otherwise, we borrow `iter` assuming that it implements `IntoIterator`.
+                _ => buf.writeln(&format!("let _iter = ({expr_code}).into_iter()")),
+            }?;
+        } else {
+            buf.writeln(&format!("let _iter = ({expr_code});"))?;
+        }
+
         if let Some(cond) = &loop_block.cond {
             self.locals.push();
             buf.write("let _iter = _iter.filter(|");
@@ -842,9 +640,19 @@ impl<'a> Generator<'a> {
         }
 
         self.locals.push();
-        buf.write("for (");
+        if loop_block.is_await {
+            // for await is handled by async-stream
+            buf.write("for await (");
+        } else {
+            buf.write("for (");
+        }
         self.visit_target(buf, true, true, &loop_block.var);
-        buf.writeln(", _loop_item) in ::askama::helpers::TemplateLoop::new(_iter) {")?;
+
+        // use `AsyncTemplateLoop` if using stream
+        buf.writeln(&format!(
+            ", _loop_item) in ::askama::helpers::{}TemplateLoop::new(_iter) {{",
+            if loop_block.is_await { "Async" } else { "" }
+        ))?;
 
         buf.writeln("_did_loop = true;")?;
         let mut size_hint1 = self.handle(ctx, &loop_block.body, buf, AstLevel::Nested)?;
@@ -1171,7 +979,11 @@ impl<'a> Generator<'a> {
                     buf_lit.write(s);
                 };
             }
-            buf.writeln(&format!("writer.write_str({:#?})?;", &buf_lit.buf))?;
+            // originaly: `writer.write_str`
+            buf.writeln(&format!(
+                "yield ::askama::ByteString::from_static({:#?});",
+                &buf_lit.buf
+            ))?;
             return Ok(buf_lit.buf.len());
         }
 
@@ -1220,13 +1032,11 @@ impl<'a> Generator<'a> {
             }
         }
 
-        buf.writeln("::std::write!(")?;
-        buf.indent();
-        buf.writeln("writer,")?;
+        buf.writeln(" yield ::askama::ByteString::from(::std::format!(")?;
         buf.writeln(&format!("{:#?},", &buf_format.buf))?;
         buf.writeln(buf_expr.buf.trim())?;
         buf.dedent()?;
-        buf.writeln(")?;")?;
+        buf.writeln("));")?;
         Ok(size_hint)
     }
 
@@ -1435,7 +1245,7 @@ impl<'a> Generator<'a> {
                 .config
                 .escapers
                 .iter()
-                .find_map(|(escapers, escaper)| escapers.contains(name).then(|| escaper))
+                .find_map(|(escapers, escaper)| escapers.contains(name).then_some(escaper))
                 .ok_or_else(|| CompileError::from("invalid escaper for escape filter"))?,
             None => self.input.escaper,
         };
@@ -2117,7 +1927,7 @@ static USE_RAW: [(&str, &str); 47] = [
     ("where", "r#where"),
     ("while", "r#while"),
     ("async", "r#async"),
-    ("await", "r#await"),
+    ("await", "await"), // this wont treat .await as field access
     ("dyn", "r#dyn"),
     ("abstract", "r#abstract"),
     ("become", "r#become"),

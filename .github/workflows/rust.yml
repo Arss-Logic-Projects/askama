@@ -8,33 +8,11 @@ on:
     - cron: "32 4 * * 5"
 
 jobs:
-  Test:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        rust: [stable, beta]
-        exclude:
-          - os: macos-latest
-            rust: beta
-          - os: windows-latest
-            rust: beta
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v1
-      - uses: ./.github/actions/setup
-        with:
-          toolchain: ${{ matrix.rust }}
-          key: test-${{ matrix.os }}-${{ matrix.rust }}
-      - run: cargo build --all-targets
-      - run: cargo test
-
   Package:
     strategy:
       matrix:
         package: [
-          askama, askama_derive, testing,
-          askama_actix, askama_axum, askama_escape, askama_gotham, askama_hyper,
-          askama_mendes, askama_rocket, askama_tide, askama_warp,
+          askama, askama_derive, askama_escape,
         ]
     runs-on: ubuntu-latest
     steps:
@@ -43,7 +21,6 @@ jobs:
         with:
           key: ${{ matrix.package }}
           components: clippy
-      - run: cd ${{ matrix.package }} && cargo test --all-targets
       - run: cd ${{ matrix.package }} && cargo clippy --all-targets -- -D warnings
 
   Lint:

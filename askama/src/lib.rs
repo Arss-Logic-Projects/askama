@@ -67,8 +67,6 @@ mod error;
 pub mod filters;
 pub mod helpers;
 
-use std::fmt;
-
 pub use askama_derive::Template;
 pub use askama_escape::{Html, MarkupDisplay, Text};
 
@@ -79,7 +77,18 @@ pub use {
     bytestring::ByteString
 };
 
-// TODO: better docs
+/// Result of calling `Template::render`
+/// currently the implementation by the derive macro uses [async_stream](https://crates.io/crates/async-stream)
+/// in the future when async generators become stable the api will use compiler generated gnerator
+///
+/// ## 'static lifetime and caveats
+/// hence the `Template::render` method takes ownership it requires `'static` lifetime.
+/// if you are using generic **types** you should add the 'static bounds specially for `Stream`s and `Future`s
+///
+/// ## Why `ByteString`
+///
+/// The type `ByteString` is backed by [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html)
+/// Which can store readonly view to both `&'static` and `String` for less allocations
 pub type RenderResult = LocalBoxStream<'static, Result<ByteString>>;
 
 #[doc(hidden)]
@@ -90,7 +99,10 @@ pub use crate::error::{Error, Result};
 ///
 /// If you need an object-safe template, use [`DynTemplate`].
 pub trait Template {
-    // TODO: better docs
+    /// Renders the template as a stream
+    ///
+    /// ## Why `self by value`
+    /// hence the implementation uses `async move {}` which requires ownership and `'static` lifetime
    fn render(self) -> RenderResult;
 
     /// The template's extension, if provided

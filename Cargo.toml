@@ -1,22 +1,12 @@
 [workspace]
 members = [
     "askama",
-    "askama_actix",
-    "askama_axum",
-    "askama_gotham",
     "askama_derive",
-    "askama_escape",
-    "askama_mendes",
-    "askama_rocket",
-    "askama_tide",
-    "askama_warp",
-    "askama_hyper",
-    "testing",
+    "askama_escape"
 ]
 
 default-members = [
     "askama",
     "askama_derive",
     "askama_escape",
-    "testing",
 ]

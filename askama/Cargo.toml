@@ -24,14 +24,6 @@ num-traits = ["askama_derive/num-traits", "dep_num_traits"]
 serde-json = ["askama_derive/serde-json", "askama_escape/json", "serde", "serde_json"]
 serde-yaml = ["askama_derive/serde-yaml", "serde", "serde_yaml"]
 urlencode = ["askama_derive/urlencode", "percent-encoding"]
-with-actix-web = ["askama_derive/with-actix-web"]
-with-axum = ["askama_derive/with-axum"]
-with-gotham = ["askama_derive/with-gotham"]
-with-hyper = ["askama_derive/with-hyper"]
-with-mendes = ["askama_derive/with-mendes"]
-with-rocket = ["askama_derive/with-rocket"]
-with-tide = ["askama_derive/with-tide"]
-with-warp = ["askama_derive/with-warp"]
 
 # deprecated
 mime = []
@@ -52,6 +44,10 @@ async-stream = "0.3.3"
 bytestring = "1.1.0"
 futures-util = "0.3.23"
 pin-project-lite = "0.2.9"
+
+[dev-dependencies]
+futures-util = "0.3.23"
+tokio = { version = "1.20.1", features = ["time", "rt", "macros"] }
 
 [package.metadata.docs.rs]
 features = ["config", "humansize", "num-traits", "serde-json", "serde-yaml"]
