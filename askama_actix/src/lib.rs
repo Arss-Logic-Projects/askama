@@ -17,14 +17,14 @@ struct ActixError(Error);
 impl fmt::Debug for ActixError {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        <Error as fmt::Debug>::fmt(&self.0, f)
+        fmt::Debug::fmt(&self.0, f)
     }
 }
 
 impl fmt::Display for ActixError {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        <Error as fmt::Display>::fmt(&self.0, f)
+        fmt::Display::fmt(&self.0, f)
     }
 }
 
