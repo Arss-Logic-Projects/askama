@@ -71,11 +71,7 @@ pub use askama_derive::Template;
 pub use askama_escape::{Html, MarkupDisplay, Text};
 
 #[doc(hidden)]
-pub use {
-    async_stream::try_stream,
-    futures_util::stream::LocalBoxStream,
-    bytestring::ByteString
-};
+pub use {async_stream::try_stream, bytestring::ByteString, futures_util::stream::LocalBoxStream};
 
 /// Result of calling `Template::render`
 /// currently the implementation by the derive macro uses [async_stream](https://crates.io/crates/async-stream)
@@ -103,7 +99,7 @@ pub trait Template {
     ///
     /// ## Why `self by value`
     /// hence the implementation uses `async move {}` which requires ownership and `'static` lifetime
-   fn render(self) -> RenderResult;
+    fn render(self) -> RenderResult;
 
     /// The template's extension, if provided
     const EXTENSION: Option<&'static str>;

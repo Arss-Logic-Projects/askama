@@ -1,7 +1,7 @@
+use futures_util::ready;
+use futures_util::stream::*;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use futures_util::stream::*;
-use futures_util::ready;
 
 pub use futures_util::stream::Filter;
 
@@ -14,7 +14,9 @@ pin_project_lite::pin_project! {
 
 impl<St: Stream> AsyncTemplateLoop<St> {
     pub fn new(stream: St) -> Self {
-        AsyncTemplateLoop { stream: stream.enumerate().peekable() }
+        AsyncTemplateLoop {
+            stream: stream.enumerate().peekable(),
+        }
     }
 }
 
@@ -27,12 +29,15 @@ impl<St: Stream + Sized> Stream for AsyncTemplateLoop<St> {
         let is_terminated = ready!(this.stream.as_mut().poll_peek(cx)).is_none();
 
         match ready!(this.stream.poll_next(cx)) {
-            Some((index, item)) => Poll::Ready(Some((item, LoopItem {
-                index,
-                first: index == 0,
-                last: is_terminated
-            }))),
-            None => Poll::Ready(None)
+            Some((index, item)) => Poll::Ready(Some((
+                item,
+                LoopItem {
+                    index,
+                    first: index == 0,
+                    last: is_terminated,
+                },
+            ))),
+            None => Poll::Ready(None),
         }
     }
 }

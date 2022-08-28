@@ -924,13 +924,15 @@ fn block_for<'a>(i: &'a str, s: &State<'_>) -> IResult<&'a str, Node<'a>> {
             ))),
         ))),
     ));
-    let (i, (pws1, _, (await_, var, _, (iter, cond, nws1, _, (body, (_, pws2, else_block, _, nws2)))))) =
-        p(i)?;
+    let (
+        i,
+        (pws1, _, (await_, var, _, (iter, cond, nws1, _, (body, (_, pws2, else_block, _, nws2))))),
+    ) = p(i)?;
     let (nws3, else_block, pws3) = else_block.unwrap_or_default();
     Ok((
         i,
         Node::Loop(Loop {
-            is_await: await_.is_some() ,
+            is_await: await_.is_some(),
             ws1: Ws(pws1, nws1),
             var,
             iter,
