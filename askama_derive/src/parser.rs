@@ -26,7 +26,7 @@ pub(crate) enum Node<'a> {
     Loop(Loop<'a>),
     Extends(Expr<'a>),
     BlockDef(Ws, &'a str, Vec<Node<'a>>, Ws),
-    Include(Ws, &'a str),
+    Include(Ws, Box<Expr<'a>>),
     Import(Ws, &'a str, &'a str),
     Macro(&'a str, Macro<'a>),
     Raw(Ws, &'a str, &'a str, &'a str, Ws),
@@ -978,13 +978,27 @@ fn block_block<'a>(i: &'a str, s: &State<'_>) -> IResult<&'a str, Node<'a>> {
 }
 
 fn block_include(i: &str) -> IResult<&str, Node<'_>> {
+    let expr_parser = map(
+        alt((
+            expr_str_lit, // path to file
+            // expressions for template
+            expr_suffix,
+            expr_prefix,
+            expr_var,
+            expr_path,
+            expr_rust_macro,
+            expr_group,
+        )),
+        Box::new,
+    );
+
     let mut p = tuple((
         opt(expr_handle_ws),
         ws(tag("include")),
-        cut(pair(ws(str_lit), opt(expr_handle_ws))),
+        cut(pair(ws(expr_parser), opt(expr_handle_ws))),
     ));
-    let (i, (pws, _, (name, nws))) = p(i)?;
-    Ok((i, Node::Include(Ws(pws, nws), name)))
+    let (i, (pws, _, (expr, nws))) = p(i)?;
+    Ok((i, Node::Include(Ws(pws, nws), expr)))
 }
 
 fn block_import(i: &str) -> IResult<&str, Node<'_>> {

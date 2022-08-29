@@ -59,19 +59,17 @@
 //!   in the configuration file. The default syntax , "default",  is the one
 //!   provided by Askama.
 
-#![forbid(unsafe_code)]
 #![deny(elided_lifetimes_in_paths)]
 #![deny(unreachable_pub)]
 
 mod error;
+#[doc(hidden)]
+pub mod exports;
 pub mod filters;
 pub mod helpers;
 
 pub use askama_derive::Template;
 pub use askama_escape::{Html, MarkupDisplay, Text};
-
-#[doc(hidden)]
-pub use {async_stream::try_stream, bytestring::ByteString, futures_util::stream::LocalBoxStream};
 
 /// Result of calling `Template::render`
 /// currently the implementation by the derive macro uses [async_stream](https://crates.io/crates/async-stream)
@@ -85,7 +83,7 @@ pub use {async_stream::try_stream, bytestring::ByteString, futures_util::stream:
 ///
 /// The type `ByteString` is backed by [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html)
 /// Which can store readonly view to both `&'static` and `String` for less allocations
-pub type RenderResult = LocalBoxStream<'static, Result<ByteString>>;
+pub type RenderResult = exports::LocalBoxStream<'static, Result<exports::ByteString>>;
 
 #[doc(hidden)]
 pub use crate as shared;

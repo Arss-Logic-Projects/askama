@@ -1,0 +1,5 @@
+content
+{% include "test_str_lit.txt" -%}
+{% include test_template_expr +%}
+
+{%+ include self::get_template() %}

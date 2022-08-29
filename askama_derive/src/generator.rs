@@ -308,7 +308,7 @@ impl<'a> Generator<'a> {
         self.write_header(buf, "::askama::Template", None)?;
         buf.writeln("#[allow(unused_mut)]")?;
         buf.writeln("fn render(mut self) -> ::askama::RenderResult {")?;
-        buf.writeln("::std::boxed::Box::pin(::askama::try_stream! {")?;
+        buf.writeln("::std::boxed::Box::pin(::askama::exports::try_stream! {")?;
 
         // Make sure the compiler understands that the generated code depends on the template files.
         for path in self.contexts.keys() {
@@ -421,8 +421,12 @@ impl<'a> Generator<'a> {
                 Node::BlockDef(ws1, name, _, ws2) => {
                     self.write_block(buf, Some(name), Ws(ws1.0, ws2.1))?;
                 }
-                Node::Include(ws, path) => {
-                    size_hint += self.handle_include(ctx, buf, ws, path)?;
+                Node::Include(ws, ref expr) => {
+                    if let Expr::StrLit(path) = expr.as_ref() {
+                        size_hint += self.handle_include(ctx, buf, ws, path)?;
+                    } else {
+                        self.handle_include_expr(ws, buf, expr)?;
+                    }
                 }
                 Node::Call(ws, scope, name, ref args) => {
                     size_hint += self.write_call(ctx, buf, ws, scope, name, args)?;
@@ -780,6 +784,31 @@ impl<'a> Generator<'a> {
         Ok(size_hint)
     }
 
+    fn handle_include_expr(
+        &mut self,
+        ws: Ws,
+        buf: &mut Buffer,
+        expr: &Expr<'a>,
+    ) -> Result<(), CompileError> {
+        self.flush_ws(ws);
+        self.write_buf_writable(buf)?;
+        let expr_code = self.visit_expr_root(expr)?;
+
+        buf.writeln("{")?;
+
+        buf.writeln(&format!("let _template = ({expr_code});"))?;
+        buf.writeln("::askama::exports::assert_is_template(&_template);")?;
+        buf.writeln("let mut _stream = _template.render();")?;
+        buf.writeln("while let Some(bytes) = ::askama::exports::try_next(&mut _stream).await? {")?;
+        buf.writeln("yield bytes;")?;
+        buf.writeln("}")?;
+
+        buf.writeln("}")?;
+        self.prepare_ws(ws);
+
+        Ok(())
+    }
+
     fn handle_include(
         &mut self,
         ctx: &'a Context<'_>,
@@ -987,7 +1016,7 @@ impl<'a> Generator<'a> {
             }
             // originaly: `writer.write_str`
             buf.writeln(&format!(
-                "yield ::askama::ByteString::from_static({:#?});",
+                "yield ::askama::exports::ByteString::from_static({:#?});",
                 &buf_lit.buf
             ))?;
             return Ok(buf_lit.buf.len());
@@ -1038,7 +1067,7 @@ impl<'a> Generator<'a> {
             }
         }
 
-        buf.writeln(" yield ::askama::ByteString::from(::std::format!(")?;
+        buf.writeln(" yield ::askama::exports::ByteString::from(::std::format!(")?;
         buf.writeln(&format!("{:#?},", &buf_format.buf))?;
         buf.writeln(buf_expr.buf.trim())?;
         buf.dedent()?;
