@@ -3,7 +3,7 @@ use bytestring::ByteString;
 use futures_util::TryStreamExt;
 
 #[derive(Template)]
-#[template(path = "include.txt", print = "code")]
+#[template(path = "include.txt")]
 struct Test {
     test_template_expr: Test2,
 }
@@ -13,7 +13,7 @@ const fn get_template() -> Test2 {
 }
 
 #[derive(Template)]
-#[template(source = "2", ext = "txt", escape = "none", print = "code")]
+#[template(source = "2", ext = "txt", escape = "none")]
 struct Test2;
 
 #[tokio::test]
