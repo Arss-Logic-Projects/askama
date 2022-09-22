@@ -61,6 +61,7 @@
 
 #![deny(elided_lifetimes_in_paths)]
 #![deny(unreachable_pub)]
+#![forbid(unsafe_code)]
 
 mod error;
 #[doc(hidden)]
@@ -83,7 +84,7 @@ pub use askama_escape::{Html, MarkupDisplay, Text};
 ///
 /// The type `ByteString` is backed by [`Bytes`](https://docs.rs/bytes/latest/bytes/struct.Bytes.html)
 /// Which can store readonly view to both `&'static` and `String` for less allocations
-pub type RenderResult = exports::LocalBoxStream<'static, Result<exports::ByteString>>;
+pub type RenderResult = exports::BoxStream<'static, Result<exports::ByteString>>;
 
 #[doc(hidden)]
 pub use crate as shared;

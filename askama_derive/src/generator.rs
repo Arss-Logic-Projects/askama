@@ -628,16 +628,12 @@ impl<'a> Generator<'a> {
 
                 // Otherwise, we borrow `iter` assuming that it implements `IntoIterator`.
                 _ => buf.writeln(&format!("let _iter = ({expr_code}).into_iter()")),
-            }?;
+            }
+        } else if expr_code.starts_with("self.") || matches!(loop_block.iter, Expr::Attr(..)) {
+            buf.writeln(&format!("let _iter = &mut ({expr_code});"))
         } else {
-            match loop_block.iter {
-                #[allow(clippy::wildcard_in_or_patterns)]
-                Expr::Attr(..) | _ if expr_code.starts_with("self.") => {
-                    buf.writeln(&format!("let _iter = &mut ({expr_code});"))
-                }
-                _ => buf.writeln(&format!("let mut _iter = ({expr_code})")),
-            }?;
-        }
+            buf.writeln(&format!("let mut _iter = ({expr_code})"))
+        }?;
 
         if let Some(cond) = &loop_block.cond {
             self.locals.push();

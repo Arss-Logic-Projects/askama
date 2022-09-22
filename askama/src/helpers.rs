@@ -5,12 +5,10 @@ use std::task::{Context, Poll};
 
 pub use futures_util::stream::Filter;
 
-pin_project_lite::pin_project! {
-    pub struct AsyncTemplateLoop<St: Stream> {
-        #[pin]
-        stream: Peekable<Enumerate<St>>
-    }
+pub struct AsyncTemplateLoop<St: Stream> {
+    stream: Peekable<Enumerate<St>>,
 }
+
 
 impl<St: Stream> AsyncTemplateLoop<St> {
     pub fn new(stream: St) -> Self {
@@ -20,25 +18,24 @@ impl<St: Stream> AsyncTemplateLoop<St> {
     }
 }
 
-impl<St: Stream + Sized> Stream for AsyncTemplateLoop<St> {
+impl<St: Stream + Unpin> Stream for AsyncTemplateLoop<St> {
     type Item = (St::Item, LoopItem);
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let mut this = self.project();
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let is_terminated = ready!(Pin::new(&mut self.stream).poll_peek(cx)).is_none();
 
-        let is_terminated = ready!(this.stream.as_mut().poll_peek(cx)).is_none();
-
-        match ready!(this.stream.poll_next(cx)) {
-            Some((index, item)) => Poll::Ready(Some((
-                item,
-                LoopItem {
-                    index,
-                    first: index == 0,
-                    last: is_terminated,
-                },
-            ))),
-            None => Poll::Ready(None),
-        }
+        self.stream.poll_next_unpin(cx).map(|opt| {
+            opt.map(|(index, item)| {
+                (
+                    item,
+                    LoopItem {
+                        index,
+                        first: index == 0,
+                        last: is_terminated,
+                    },
+                )
+            })
+        })
     }
 }
 
